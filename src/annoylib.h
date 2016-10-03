@@ -145,6 +145,7 @@ struct Angular {
     S n_descendants;
     S children[2]; // Will possibly store more than 2
     T v[1]; // We let this one overflow intentionally. Need to allocate at least 1 to make GCC happy
+    double bias;
   };
   template<typename T>
   static inline T distance(const T* x, const T* y, int f) {
@@ -251,14 +252,14 @@ template<typename S, typename T>
 class AnnoyIndexInterface {
  public:
   virtual ~AnnoyIndexInterface() {};
-  virtual void add_item(S item, const T* w) = 0;
+  virtual void add_item(S item, const T* w, double bias) = 0;
   virtual void build(int q) = 0;
   virtual bool save(const char* filename) = 0;
   virtual void unload() = 0;
   virtual bool load(const char* filename) = 0;
   virtual T get_distance(S i, S j) = 0;
   virtual void get_nns_by_item(S item, size_t n, size_t search_k, vector<S>* result, vector<T>* distances) = 0;
-  virtual void get_nns_by_vector(const T* w, size_t n, size_t search_k, vector<S>* result, vector<T>* distances) = 0;
+  virtual void get_nns_by_vector(const T* w, size_t n, size_t search_k, vector<S>* result, double rescale, vector<T>* distances) = 0;
   virtual S get_n_items() = 0;
   virtual void verbose(bool v) = 0;
   virtual void get_item(S item, T* v) = 0;
@@ -306,18 +307,19 @@ public:
     return _f;
   }
 
-  void add_item(S item, const T* w) {
-    add_item_impl(item, w);
+  void add_item(S item, const T* w, double bias) {
+    add_item_impl(item, w, bias);
   }
 
   template<typename W>
-  void add_item_impl(S item, const W& w) {
+  void add_item_impl(S item, const W& w, double bias) {
     _allocate_size(item + 1);
     Node* n = _get(item);
 
     n->children[0] = 0;
     n->children[1] = 0;
     n->n_descendants = 1;
+    n->bias = bias;
 
     for (int z = 0; z < _f; z++)
       n->v[z] = w[z];
@@ -435,11 +437,11 @@ public:
 
   void get_nns_by_item(S item, size_t n, size_t search_k, vector<S>* result, vector<T>* distances) {
     const Node* m = _get(item);
-    _get_all_nns(m->v, n, search_k, result, distances);
+    _get_all_nns(m->v, n, search_k, result, 1.0, distances);
   }
 
-  void get_nns_by_vector(const T* w, size_t n, size_t search_k, vector<S>* result, vector<T>* distances) {
-    _get_all_nns(w, n, search_k, result, distances);
+  void get_nns_by_vector(const T* w, size_t n, size_t search_k, vector<S>* result, double rescale, vector<T>* distances) {
+    _get_all_nns(w, n, search_k, result, rescale, distances);
   }
   S get_n_items() {
     return _n_items;
@@ -541,7 +543,7 @@ protected:
     return item;
   }
 
-  void _get_all_nns(const T* v, size_t n, size_t search_k, vector<S>* result, vector<T>* distances) {
+  void _get_all_nns(const T* v, size_t n, size_t search_k, vector<S>* result, double rescale, vector<T>* distances) {
     std::priority_queue<pair<T, S> > q;
 
     if (search_k == (size_t)-1)
@@ -580,7 +582,7 @@ protected:
       if (j == last)
         continue;
       last = j;
-      nns_dist.push_back(make_pair(D::distance(v, _get(j)->v, _f), j));
+      nns_dist.push_back(make_pair(D::distance(v, _get(j)->v, _f) * rescale + _get(j)->bias, j));
     }
 
     size_t m = nns_dist.size();

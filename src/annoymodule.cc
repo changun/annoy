@@ -161,7 +161,7 @@ py_an_get_nns_by_item(py_annoy *self, PyObject *args) {
   vector<float> distances;
 
   Py_BEGIN_ALLOW_THREADS;
-  self->ptr->get_nns_by_item(item, n, search_k, &result, include_distances ? &distances : NULL);
+  self->ptr->get_nns_by_item(item, n, search_k, &result, (double)1.0, include_distances ? &distances : NULL);
   Py_END_ALLOW_THREADS;
 
   return get_nns_to_python(result, distances, include_distances);
@@ -172,9 +172,11 @@ static PyObject*
 py_an_get_nns_by_vector(py_annoy *self, PyObject *args) {
   PyObject* v;
   int32_t n, search_k=-1, include_distances=0;
+  double rescale;
+
   if (!self->ptr) 
     Py_RETURN_NONE;
-  if (!PyArg_ParseTuple(args, "Oi|ii", &v, &n, &search_k, &include_distances))
+  if (!PyArg_ParseTuple(args, "Oi|idi", &v, &n, &search_k, &rescale, &include_distances))
     Py_RETURN_NONE;
 
   vector<float> w(self->f);
@@ -187,7 +189,7 @@ py_an_get_nns_by_vector(py_annoy *self, PyObject *args) {
   vector<float> distances;
 
   Py_BEGIN_ALLOW_THREADS;
-  self->ptr->get_nns_by_vector(&w[0], n, search_k, &result, include_distances ? &distances : NULL);
+  self->ptr->get_nns_by_vector(&w[0], n, search_k, &result, &rescale, include_distances ? &distances : NULL);
   Py_END_ALLOW_THREADS;
 
   return get_nns_to_python(result, distances, include_distances);
@@ -217,9 +219,10 @@ static PyObject*
 py_an_add_item(py_annoy *self, PyObject *args) {
   PyObject* l;
   int32_t item;
+  double bias
   if (!self->ptr) 
     Py_RETURN_NONE;
-  if (!PyArg_ParseTuple(args, "iO", &item, &l))
+  if (!PyArg_ParseTuple(args, "iOd", &item, &l, &bias))
     Py_RETURN_NONE;
 
   vector<float> w(self->f, 0.0);
@@ -227,7 +230,7 @@ py_an_add_item(py_annoy *self, PyObject *args) {
     PyObject *pf = PyList_GetItem(l,z);
     w[z] = PyFloat_AsDouble(pf);
   }
-  self->ptr->add_item(item, &w[0]);
+  self->ptr->add_item(item, &w[0], bias);
 
   Py_RETURN_NONE;
 }

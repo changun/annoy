@@ -39,16 +39,16 @@ class AnnoyIndex(Annoy):
                 (item, self.get_n_items()))
         return item
 
-    def add_item(self, i, vector):
+    def add_item(self, i, vector, bias=0.0):
         """
         Adds item `i` (any nonnegative integer) with vector `v`.
 
         Note that it will allocate memory for `max(i)+1` items.
         """
         # Wrapper to convert inputs to list
-        return super(AnnoyIndex, self).add_item(self.check_item(i, building=True), self.check_list(vector))
+        return super(AnnoyIndex, self).add_item(self.check_item(i, building=True), self.check_list(vector,), bias)
 
-    def get_nns_by_vector(self, vector, n, search_k=-1, include_distances=False):
+    def get_nns_by_vector(self, vector, n, search_k=-1, rescale=1.0, include_distances=False):
         """
         Returns the `n` closest items to vector `vector`.
 
@@ -61,7 +61,7 @@ class AnnoyIndex(Annoy):
         The second list contains the corresponding distances.
         """
         # Same
-        return super(AnnoyIndex, self).get_nns_by_vector(self.check_list(vector), n, search_k, include_distances)
+        return super(AnnoyIndex, self).get_nns_by_vector(self.check_list(vector), n, search_k, rescale, include_distances)
 
     def get_nns_by_item(self, i, n, search_k=-1, include_distances=False):
         """
